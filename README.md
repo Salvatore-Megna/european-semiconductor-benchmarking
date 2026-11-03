@@ -4,7 +4,7 @@
 
 Financial comparison of **ASML, ASM International, Besi, AIXTRON, VAT Group and Technoprobe**, built from published corporate financial statements. The study compares growth, operating profitability, R&D intensity, asset utilization and capital structure, then explores financial profiles through standardized PCA.
 
-> **Status: private validation candidate.** Original input and historical workbooks have been audited independently. An adapted canonical R pipeline and automated checks are provided, but the GitHub Actions outcome has not yet been verified. The archived report is an advanced historical revision, not necessarily the final styling discussed in the original chat.
+> **Status: private, computational validation passed.** The original input and historical workbooks were audited independently, and the reconstructed workflow passed both source-integrity and full R regression tests in a clean GitHub Actions environment ([successful run](https://github.com/Salvatore-Megna/european-semiconductor-benchmarking/actions/runs/41731168922)). The advanced archived report still requires a final editorial/source-rights review before public release.
 
 ## At a glance
 
@@ -50,7 +50,7 @@ Source-integrity checks can be run with:
 python -m unittest discover -s tests -p 'test_*.py' -v
 ```
 
-The [GitHub Actions workflow](.github/workflows/reproducibility.yml) performs both checks in a clean environment. An automated workflow is not proof of success until its job runs finish.
+Both jobs in the [GitHub Actions workflow](https://github.com/Salvatore-Megna/european-semiconductor-benchmarking/actions/runs/41731168922) **completed successfully**: authentic-source checks and end-to-end R reproduction. The R job confirmed the source workbooks, 180 ratio values, annual medians, PCA eigenvalues/association magnitudes, two expected IQR outliers, and regenerated figures.
 
 ## Repository layout
 
@@ -71,4 +71,4 @@ See [data documentation](data/README.md), [archived report](report/report.pdf) a
 
 This is a small descriptive panel across different parts of the European semiconductor supply chain, not a representative survey or causal study. Comparisons use ratios and indexed revenue rather than absolute mixed-currency totals (EUR/CHF). Financial restatements and reporting differences remain relevant, and the PCA axes carry no causal interpretation.
 
-Recovered report is in Italian; repository documentation is in English. **Keep private** until end-to-end CI and a final review of the report and redistribution terms. The historical R v7 is preserved but the executable script is an explicit adaptation; no unrecovered lockfile or license is claimed.
+Recovered report is in Italian; repository documentation is in English. **Keep private** pending a final review of the report revision, company-source redistribution terms and licensing. Computational validation has already passed. The historical R v7 is preserved but the executable script is an explicit adaptation; no unrecovered lockfile or license is claimed.
