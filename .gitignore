@@ -1,0 +1,22 @@
+# Analysis output is generated, not committed.
+outputs/
+
+# R state, editor and OS temporary files
+.Rhistory
+.RData
+.Ruserdata
+.Rproj.user/
+*.Rproj
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# LaTeX intermediate files
+*.aux
+*.log
+*.out
+*.toc
+*.synctex.gz
+*.fls
+*.fdb_latexmk

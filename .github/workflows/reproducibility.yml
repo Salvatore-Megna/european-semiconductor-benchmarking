@@ -1,0 +1,31 @@
+name: Reproduce financial benchmarking
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  validate-source:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Verify recovered artifact checksums
+        run: python -m unittest discover -s tests -p 'test_*.py' -v
+
+  reproduce-analysis:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: r-lib/actions/setup-r@v2
+        with:
+          r-version: '4.4.1'
+      - name: Install analysis dependencies
+        run: Rscript -e 'install.packages(c("readxl", "dplyr", "tidyr", "ggplot2", "writexl"), repos="https://cloud.r-project.org")'
+      - name: Run canonical R pipeline
+        run: Rscript scripts/run_all.R
+      - name: Check results against historical workbook
+        run: Rscript tests/check_results.R

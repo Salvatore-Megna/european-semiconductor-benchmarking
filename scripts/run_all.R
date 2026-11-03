@@ -1,3 +1,9 @@
+# Pipeline canonica adattata dalla versione storica v7 (preservata in docs/source_archive/).
+# Eseguire dalla radice del repository: Rscript scripts/run_all.R
+if (!file.exists("data/raw/benchmark_semiconductor_europe_2020_2025_CORRETTO.xlsx")) {
+  stop("Eseguire dalla radice del repository.")
+}
+
 # ============================================================
 # ANALISI BENCHMARKING - TECNOLOGIE EUROPEE PER SEMICONDUTTORI
 # Imprese: ASML, ASM International, Besi, AIXTRON, VAT Group, Technoprobe
@@ -38,41 +44,14 @@ message("1/9 - Pacchetti disponibili.")
 # 1. FILE DI INPUT E CARTELLE DI OUTPUT
 # ------------------------------------------------------------
 
-percorso_excel <- "C:/Users/totim/Downloads/benchmark_semiconductor_europe_2021_2025.xlsx"
+# Percorsi relativi alla radice del repository, senza dipendenze dal PC originale.
+percorso_excel <- file.path("data", "raw", "benchmark_semiconductor_europe_2020_2025_CORRETTO.xlsx")
+if (!file.exists(percorso_excel)) stop("Dataset sorgente non trovato: ", percorso_excel)
 
-if (!file.exists(percorso_excel)) {
-  stop(
-    paste0(
-      "File Excel non trovato:\n",
-      percorso_excel,
-      "\nControlla che il file sia ancora nella cartella Download."
-    )
-  )
-}
-
-download_dir <- "C:/Users/totim/Downloads"
-
-cartella_grafici <- file.path(
-  download_dir,
-  "grafici_semiconductor"
-)
-
-cartella_risultati <- file.path(
-  download_dir,
-  "risultati_semiconductor"
-)
-
-dir.create(
-  cartella_grafici,
-  showWarnings = FALSE,
-  recursive = TRUE
-)
-
-dir.create(
-  cartella_risultati,
-  showWarnings = FALSE,
-  recursive = TRUE
-)
+cartella_grafici <- file.path("outputs", "figures")
+cartella_risultati <- file.path("outputs", "tables")
+dir.create(cartella_grafici, recursive = TRUE, showWarnings = FALSE)
+dir.create(cartella_risultati, recursive = TRUE, showWarnings = FALSE)
 
 message("2/9 - File Excel trovato e cartelle di output pronte.")
 
@@ -130,6 +109,14 @@ raw <- readxl::read_excel(
     total_equity = `Total Equity (LCY m)`
   ) |>
   arrange(company, year)
+
+
+# Il file corretto contiene i valori di R&S 2020: non imputare valori silenziosamente.
+stopifnot(nrow(raw) == 36L)
+stopifnot(length(unique(raw$company)) == 6L)
+stopifnot(identical(as.integer(sort(unique(raw$year))), 2020:2025))
+stopifnot(!anyDuplicated(raw[c("company", "year")]))
+stopifnot(!anyNA(raw$rd_expense))
 
 message(
   "3/9 - Raw_Data letto correttamente: ",
@@ -215,6 +202,38 @@ message(
   "4/9 - Indicatori calcolati: 30 osservazioni x 6 indicatori."
 )
 
+
+# ------------------------------------------------------------
+# 3A. RICAVI INDICIZZATI - BASE 2020 = 100
+# ------------------------------------------------------------
+
+# I ricavi indicizzati servono nel grafico di crescita per mostrare
+# la traiettoria cumulativa di ciascuna impresa, indipendentemente
+# dalla diversa scala e valuta di bilancio.
+
+ricavi_indicizzati <- raw |>
+  group_by(company) |>
+  arrange(year, .by_group = TRUE) |>
+  mutate(
+    revenue_index_2020 = revenue / revenue[year == 2020] * 100
+  ) |>
+  ungroup() |>
+  filter(year >= 2020, year <= 2025) |>
+  select(
+    company,
+    country,
+    year,
+    revenue_index_2020
+  )
+
+benchmark_ricavi_indicizzati <- ricavi_indicizzati |>
+  group_by(year) |>
+  summarise(
+    benchmark = median(revenue_index_2020, na.rm = TRUE),
+    .groups = "drop"
+  )
+
+
 # ------------------------------------------------------------
 # 4. ANALISI DESCRITTIVA
 # ------------------------------------------------------------
@@ -280,19 +299,11 @@ message("5/9 - Analisi descrittiva completata.")
 
 # ------------------------------------------------------------
 # 5. BENCHMARK:
-#    MEDIANA DELLE ALTRE CINQUE IMPRESE
+#    MEDIANA ANNUALE COMUNE DELLE 6 IMPRESE
 # ------------------------------------------------------------
 
-loo_median <- function(x) {
-
-  vapply(
-    seq_along(x),
-    function(i) {
-      median(x[-i], na.rm = TRUE)
-    },
-    numeric(1)
-  )
-}
+# Per ogni anno e indicatore calcoliamo una sola mediana comune.
+# Ogni impresa viene quindi confrontata con lo stesso benchmark annuale.
 
 benchmark_long <- indicatori |>
   pivot_longer(
@@ -305,7 +316,7 @@ benchmark_long <- indicatori |>
     indicatore
   ) |>
   mutate(
-    benchmark = loo_median(valore),
+    benchmark = median(valore, na.rm = TRUE),
     scostamento = valore - benchmark
   ) |>
   ungroup() |>
@@ -322,22 +333,33 @@ benchmark_long <- indicatori |>
 
     # Gli indicatori espressi come proporzioni vengono
     # trasformati in punti percentuali solo nei grafici.
-    scostamento_plot = case_when(
+    valore_plot = case_when(
       indicatore %in% c(
         "revenue_growth",
         "ros",
         "rd_intensity",
         "autonomia_finanziaria"
-      ) ~ scostamento * 100,
+      ) ~ valore * 100,
+      TRUE ~ valore
+    ),
 
-      TRUE ~ scostamento
-    )
+    benchmark_plot = case_when(
+      indicatore %in% c(
+        "revenue_growth",
+        "ros",
+        "rd_intensity",
+        "autonomia_finanziaria"
+      ) ~ benchmark * 100,
+      TRUE ~ benchmark
+    ),
+
+    scostamento_plot = valore_plot - benchmark_plot
   )
 
-message("6/9 - Benchmark leave-one-out calcolato.")
+message("6/9 - Benchmark annuale comune calcolato.")
 
 # ------------------------------------------------------------
-# 6. GRAFICI DI BENCHMARKING
+# 6. GRAFICI FINALI PER IL REPORT
 # ------------------------------------------------------------
 
 tema_report <- theme_minimal(
@@ -350,40 +372,215 @@ tema_report <- theme_minimal(
       face = "bold",
       size = 14
     ),
+    plot.subtitle = element_text(
+      size = 10.5
+    ),
     strip.text = element_text(
       face = "bold"
     ),
     axis.title.x = element_blank()
   )
 
-grafico_benchmark <- function(
+sottotitolo_benchmark <-
+  "La linea nera tratteggiata rappresenta la mediana annuale del campione"
+
+# ------------------------------------------------------------
+# FIGURA 1 - CRESCITA E INNOVAZIONE
+# Ricavi indicizzati (2020=100) + intensità R&S effettiva
+# ------------------------------------------------------------
+
+rd_effettiva <- raw |>
+  filter(
+    year >= 2020,
+    year <= 2025
+  ) |>
+  transmute(
+    company,
+    year,
+    valore = rd_expense / revenue * 100
+  )
+
+if (anyNA(rd_effettiva$valore)) {
+  stop("Manca almeno un valore R&S 2020-2025: controllare il foglio Raw_Data.")
+}
+
+benchmark_rd <- rd_effettiva |>
+  group_by(year) |>
+  summarise(
+    benchmark = median(valore, na.rm = TRUE),
+    .groups = "drop"
+  )
+
+fig1_ricavi <- ricavi_indicizzati |>
+  transmute(
+    company,
+    year,
+    indicatore = "Ricavi indicizzati (2020 = 100)",
+    valore = revenue_index_2020
+  )
+
+fig1_rd <- rd_effettiva |>
+  transmute(
+    company,
+    year,
+    indicatore = "Intensità R&S (%)",
+    valore
+  )
+
+fig1_dati <- bind_rows(
+  fig1_ricavi,
+  fig1_rd
+) |>
+  mutate(
+    indicatore = factor(
+      indicatore,
+      levels = c(
+        "Ricavi indicizzati (2020 = 100)",
+        "Intensità R&S (%)"
+      )
+    )
+  )
+
+fig1_benchmark <- bind_rows(
+  benchmark_ricavi_indicizzati |>
+    transmute(
+      year,
+      indicatore = "Ricavi indicizzati (2020 = 100)",
+      benchmark
+    ),
+  benchmark_rd |>
+    transmute(
+      year,
+      indicatore = "Intensità R&S (%)",
+      benchmark
+    )
+) |>
+  mutate(
+    indicatore = factor(
+      indicatore,
+      levels = c(
+        "Ricavi indicizzati (2020 = 100)",
+        "Intensità R&S (%)"
+      )
+    )
+  )
+
+p1 <- ggplot(
+  fig1_dati,
+  aes(
+    x = year,
+    y = valore,
+    color = company,
+    group = company
+  )
+) +
+  geom_line(
+    linewidth = 0.85
+  ) +
+  geom_point(
+    size = 2.2
+  ) +
+  geom_line(
+    data = fig1_benchmark,
+    aes(
+      x = year,
+      y = benchmark,
+      group = indicatore
+    ),
+    inherit.aes = FALSE,
+    color = "black",
+    linetype = "dashed",
+    linewidth = 0.75
+  ) +
+  facet_wrap(
+    ~ indicatore,
+    scales = "free_y"
+  ) +
+  scale_x_continuous(
+    breaks = 2020:2025
+  ) +
+  labs(
+    title = "Evoluzione dei ricavi e dell'intensità di R&S",
+    subtitle = sottotitolo_benchmark,
+    y = NULL,
+    color = "Impresa"
+  ) +
+  tema_report
+
+salva_grafico(
+  p1,
+  "01_crescita_innovazione",
+  10,
+  6
+)
+
+# ------------------------------------------------------------
+# FUNZIONE GENERALE:
+# VALORI EFFETTIVI + MEDIANA ANNUALE
+# ------------------------------------------------------------
+
+benchmark_linee <- benchmark_long |>
+  distinct(
+    year,
+    indicatore,
+    indicatore_label,
+    benchmark_plot
+  )
+
+grafico_valori_benchmark <- function(
   indicatori_scelti,
-  titolo
+  titolo,
+  ordine_pannelli
 ) {
 
-  benchmark_long |>
+  dati_plot <- benchmark_long |>
     filter(
-      indicatore %in%
-        indicatori_scelti
+      indicatore %in% indicatori_scelti
     ) |>
-    ggplot(
-      aes(
-        x = year,
-        y = scostamento_plot,
-        color = company,
-        group = company
+    mutate(
+      indicatore_label = factor(
+        indicatore_label,
+        levels = ordine_pannelli
       )
-    ) +
-    geom_hline(
-      yintercept = 0,
-      linetype = "dashed",
-      linewidth = 0.5
-    ) +
+    )
+
+  benchmark_plot_df <- benchmark_linee |>
+    filter(
+      indicatore %in% indicatori_scelti
+    ) |>
+    mutate(
+      indicatore_label = factor(
+        indicatore_label,
+        levels = ordine_pannelli
+      )
+    )
+
+  ggplot(
+    dati_plot,
+    aes(
+      x = year,
+      y = valore_plot,
+      color = company,
+      group = company
+    )
+  ) +
     geom_line(
       linewidth = 0.85
     ) +
     geom_point(
       size = 2.2
+    ) +
+    geom_line(
+      data = benchmark_plot_df,
+      aes(
+        x = year,
+        y = benchmark_plot,
+        group = indicatore_label
+      ),
+      inherit.aes = FALSE,
+      color = "black",
+      linetype = "dashed",
+      linewidth = 0.75
     ) +
     facet_wrap(
       ~ indicatore_label,
@@ -394,35 +591,28 @@ grafico_benchmark <- function(
     ) +
     labs(
       title = titolo,
-      y = "Scostamento dalla mediana delle altre imprese",
+      subtitle = sottotitolo_benchmark,
+      y = NULL,
       color = "Impresa"
     ) +
     tema_report
 }
 
-# Crescita e innovazione
-p1 <- grafico_benchmark(
-  c(
-    "revenue_growth",
-    "rd_intensity"
-  ),
-  "Crescita e innovazione"
-)
+# ------------------------------------------------------------
+# FIGURA 2 - REDDITIVITÀ ED EFFICIENZA
+# ------------------------------------------------------------
 
-salva_grafico(
-  p1,
-  "01_crescita_innovazione",
-  10,
-  6
-)
-
-# Redditività ed efficienza
-p2 <- grafico_benchmark(
-  c(
+p2 <- grafico_valori_benchmark(
+  indicatori_scelti = c(
     "ros",
     "asset_turnover"
   ),
-  "Redditività ed efficienza"
+  titolo =
+    "Evoluzione della redditività e dell'efficienza",
+  ordine_pannelli = c(
+    "ROS",
+    "Asset Turnover"
+  )
 )
 
 salva_grafico(
@@ -432,13 +622,21 @@ salva_grafico(
   6
 )
 
-# Struttura finanziaria
-p3 <- grafico_benchmark(
-  c(
+# ------------------------------------------------------------
+# FIGURA 3 - STRUTTURA FINANZIARIA
+# ------------------------------------------------------------
+
+p3 <- grafico_valori_benchmark(
+  indicatori_scelti = c(
     "autonomia_finanziaria",
     "current_ratio"
   ),
-  "Struttura finanziaria"
+  titolo =
+    "Evoluzione della struttura finanziaria",
+  ordine_pannelli = c(
+    "Autonomia finanziaria",
+    "Current Ratio"
+  )
 )
 
 salva_grafico(
@@ -449,7 +647,7 @@ salva_grafico(
 )
 
 message(
-  "7/9 - Grafici di benchmarking salvati."
+  "7/9 - Grafici finali con valori effettivi e benchmark salvati."
 )
 
 # ------------------------------------------------------------
@@ -511,6 +709,45 @@ pca_loadings <- data.frame(
   row.names = NULL
 )
 
+# Associazione (correlazione) tra variabili originarie e componenti.
+# È più immediata da interpretare dei soli coefficienti degli autovettori.
+pca_associazioni <- as.data.frame(
+  sweep(
+    pca$rotation,
+    2,
+    pca$sdev,
+    FUN = "*"
+  )
+)
+
+pca_associazioni <- cbind(
+  variabile = rownames(pca_associazioni),
+  pca_associazioni
+)
+
+rownames(pca_associazioni) <- NULL
+
+pca_associazioni_report <- pca_associazioni |>
+  transmute(
+    Variabile = case_when(
+      variabile == "revenue_growth" ~ "ΔRIC",
+      variabile == "ros" ~ "ROS",
+      variabile == "rd_intensity" ~ "R&S",
+      variabile == "asset_turnover" ~ "AT",
+      variabile == "autonomia_finanziaria" ~ "AF"
+    ),
+    PC1 = round(PC1, 3),
+    PC2 = round(PC2, 3)
+  )
+
+pca_componenti_report <- pca_varianza |>
+  transmute(
+    Componente = componente,
+    Autovalore = round(autovalore, 3),
+    `Varianza spiegata (%)` = round(varianza_spiegata * 100, 1),
+    `Varianza cumulata (%)` = round(varianza_cumulata * 100, 1)
+  )
+
 # Score delle 30 osservazioni impresa-anno
 pca_scores <- data.frame(
   company = indicatori$company,
@@ -535,8 +772,13 @@ rownames(
 ) <- NULL
 
 # ------------------------------------------------------------
-# 7A. SCREE PLOT
+# 7A. SCREE PLOT - OUTPUT DI SUPPORTO
 # ------------------------------------------------------------
+
+# Questo grafico viene prodotto e conservato, ma non è previsto
+# tra le quattro figure principali del report.
+
+blu_report <- "#3E6F8E"
 
 p_scree <- ggplot(
   pca_varianza,
@@ -546,20 +788,19 @@ p_scree <- ggplot(
   )
 ) +
   geom_col(
-    width = 0.7
+    width = 0.7,
+    fill = blu_report,
+    color = blu_report
   ) +
   geom_text(
     aes(
       label = paste0(
-        round(
-          varianza_spiegata * 100,
-          1
-        ),
+        round(varianza_spiegata * 100, 1),
         "%"
       )
     ),
-    vjust = -0.4,
-    size = 3.5
+    vjust = -0.45,
+    size = 3.6
   ) +
   labs(
     title = "Varianza spiegata dalle componenti principali",
@@ -570,9 +811,7 @@ p_scree <- ggplot(
   coord_cartesian(
     ylim = c(
       0,
-      max(
-        pca_varianza$varianza_spiegata * 100
-      ) * 1.15
+      max(pca_varianza$varianza_spiegata * 100) * 1.15
     )
   ) +
   tema_report +
@@ -583,13 +822,13 @@ p_scree <- ggplot(
 
 salva_grafico(
   p_scree,
-  "04_pca_varianza_spiegata",
+  "SUPPORTO_pca_varianza_spiegata",
   8,
   5.5
 )
 
 # ------------------------------------------------------------
-# 7B. MAPPA PCA CON TRAIETTORIE 2021-2025
+# 7B. MAPPA PCA FINALE PER IL REPORT
 # ------------------------------------------------------------
 
 scores_plot <- pca_scores |>
@@ -598,6 +837,13 @@ scores_plot <- pca_scores |>
     year,
     PC1,
     PC2
+  ) |>
+  mutate(
+    anno_label = if_else(
+      year %in% c(2021, 2025),
+      substr(as.character(year), 3, 4),
+      ""
+    )
   )
 
 loadings_plot <- pca_loadings |>
@@ -607,32 +853,57 @@ loadings_plot <- pca_loadings |>
     PC2
   )
 
-# Scala grafica delle frecce dei loading
-scala_frecce <- 0.70 * min(
+# Frecce volutamente più corte rispetto alla prima versione:
+# servono a leggere la direzione delle variabili senza invadere
+# l'area occupata dalle osservazioni impresa-anno.
+scala_frecce <- 0.34 * min(
   diff(range(scores_plot$PC1)) /
     diff(range(loadings_plot$PC1)),
-
   diff(range(scores_plot$PC2)) /
     diff(range(loadings_plot$PC2))
 )
 
 loadings_plot <- loadings_plot |>
   mutate(
-
-    PC1_plot =
-      PC1 * scala_frecce,
-
-    PC2_plot =
-      PC2 * scala_frecce,
+    PC1_plot = PC1 * scala_frecce,
+    PC2_plot = PC2 * scala_frecce,
 
     label = case_when(
-      variabile == "revenue_growth" ~ "Crescita ricavi",
+      variabile == "revenue_growth" ~ "ΔRIC",
       variabile == "ros" ~ "ROS",
       variabile == "rd_intensity" ~ "R&S",
-      variabile == "asset_turnover" ~ "Asset Turnover",
-      variabile == "autonomia_finanziaria" ~ "Autonomia finanziaria"
+      variabile == "asset_turnover" ~ "AT",
+      variabile == "autonomia_finanziaria" ~ "AF"
+    ),
+
+    # Piccoli spostamenti manuali e deterministici:
+    # separano soprattutto ΔRIC e AT, che puntano nella stessa zona.
+    label_x = case_when(
+      label == "ΔRIC" ~ PC1_plot - 0.02,
+      label == "AT"   ~ PC1_plot - 0.18,
+      label == "ROS"  ~ PC1_plot - 0.08,
+      label == "R&S"  ~ PC1_plot + 0.10,
+      label == "AF"   ~ PC1_plot + 0.07
+    ),
+
+    label_y = case_when(
+      label == "ΔRIC" ~ PC2_plot + 0.18,
+      label == "AT"   ~ PC2_plot - 0.12,
+      label == "ROS"  ~ PC2_plot - 0.10,
+      label == "R&S"  ~ PC2_plot - 0.10,
+      label == "AF"   ~ PC2_plot + 0.12
     )
   )
+
+pc1_pct <- round(
+  pca_varianza$varianza_spiegata[1] * 100,
+  1
+)
+
+pc2_pct <- round(
+  pca_varianza$varianza_spiegata[2] * 100,
+  1
+)
 
 p_pca <- ggplot(
   scores_plot,
@@ -645,40 +916,37 @@ p_pca <- ggplot(
 ) +
   geom_hline(
     yintercept = 0,
-    linewidth = 0.4,
-    color = "grey70"
+    linewidth = 0.35,
+    color = "grey75"
   ) +
   geom_vline(
     xintercept = 0,
-    linewidth = 0.4,
-    color = "grey70"
-  ) +
-  geom_path(
-    linewidth = 0.75,
-    alpha = 0.65
-  ) +
-  geom_point(
-    size = 2.5
+    linewidth = 0.35,
+    color = "grey75"
   ) +
 
-  # Etichette solo all'inizio e alla fine
-  # per evitare un grafico troppo affollato.
+  # Traiettorie temporali
+  geom_path(
+    linewidth = 0.70,
+    alpha = 0.55
+  ) +
+
+  geom_point(
+    size = 2.6
+  ) +
+
+  # Solo 21 e 25: inizio e fine del periodo.
   geom_text(
-    data =
-      scores_plot |>
-      filter(
-        year %in%
-          c(2021, 2025)
-      ),
-    aes(
-      label = year
-    ),
-    vjust = -0.8,
-    size = 3,
+    data = scores_plot |>
+      filter(anno_label != ""),
+    aes(label = anno_label),
+    vjust = -0.85,
+    size = 3.1,
+    fontface = "bold",
     show.legend = FALSE
   ) +
 
-  # Frecce dei loading
+  # Frecce delle variabili
   geom_segment(
     data = loadings_plot,
     aes(
@@ -689,71 +957,56 @@ p_pca <- ggplot(
     ),
     inherit.aes = FALSE,
     arrow = arrow(
-      length =
-        grid::unit(
-          0.18,
-          "cm"
-        )
+      length = grid::unit(0.17, "cm")
     ),
-    linewidth = 0.6,
-    color = "grey25"
+    linewidth = 0.65,
+    color = "grey20"
   ) +
 
+  # Solo acronimi: nessun nome esteso sovrapposto ai punti.
   geom_text(
     data = loadings_plot,
     aes(
-      x =
-        PC1_plot * 1.10,
-      y =
-        PC2_plot * 1.10,
+      x = label_x,
+      y = label_y,
       label = label
     ),
     inherit.aes = FALSE,
-    size = 3.3,
+    size = 3.8,
+    fontface = "bold",
     color = "grey15"
   ) +
 
   labs(
-    title =
-      "Mappa competitiva delle imprese",
-
-    subtitle =
-      paste0(
-        "PC1 = ",
-        round(
-          pca_varianza$varianza_spiegata[1] * 100,
-          1
-        ),
-        "% | PC2 = ",
-        round(
-          pca_varianza$varianza_spiegata[2] * 100,
-          1
-        ),
-        "%"
-      ),
-
-    x =
-      "Prima componente principale",
-
-    y =
-      "Seconda componente principale",
-
-    color =
-      "Impresa"
+    title = "Posizionamento competitivo nel piano PCA",
+    subtitle = "Osservazioni impresa-anno, 2021–2025",
+    x = paste0(
+      "PC1 (",
+      format(pc1_pct, decimal.mark = ","),
+      "% della varianza)"
+    ),
+    y = paste0(
+      "PC2 (",
+      format(pc2_pct, decimal.mark = ","),
+      "% della varianza)"
+    ),
+    color = "Impresa"
   ) +
   tema_report +
   theme(
-    axis.title.x = element_text()
+    axis.title.x = element_text(),
+    legend.position = "bottom",
+    plot.subtitle = element_text(size = 11)
   )
 
 salva_grafico(
   p_pca,
-  "05_pca_mappa_competitiva",
+  "04_pca_mappa_competitiva",
   9,
   6.5
 )
 
-message("8/9 - PCA completata e grafici PCA salvati.")
+message("8/9 - PCA completata e grafici PCA finali salvati.")
 
 # ------------------------------------------------------------
 # 8. ESPORTAZIONE RISULTATI IN EXCEL
@@ -775,8 +1028,17 @@ writexl::write_xlsx(
     Mediane_annuali =
       mediane_annuali,
 
-    Benchmark_LOO =
+    Ricavi_indicizzati =
+      ricavi_indicizzati,
+
+    Benchmark_ricavi_ind =
+      benchmark_ricavi_indicizzati,
+
+    Benchmark_annuale =
       benchmark_long,
+
+    Benchmark_linee =
+      benchmark_linee,
 
     Outlier_IQR =
       outlier_iqr,
@@ -786,6 +1048,15 @@ writexl::write_xlsx(
 
     PCA_loadings =
       pca_loadings,
+
+    PCA_associazioni =
+      pca_associazioni,
+
+    PCA_componenti_report =
+      pca_componenti_report,
+
+    PCA_associazioni_report =
+      pca_associazioni_report,
 
     PCA_scores =
       pca_scores,
@@ -815,6 +1086,32 @@ print(
 
 cat(
   "\n\n==============================\n",
+  "RICAVI INDICIZZATI - 2020=100\n",
+  "==============================\n"
+)
+
+print(
+  ricavi_indicizzati |>
+    filter(year %in% c(2020, 2025)) |>
+    tidyr::pivot_wider(
+      names_from = year,
+      values_from = revenue_index_2020,
+      names_prefix = "anno_"
+    ),
+  width = Inf
+)
+
+cat(
+  "\nBenchmark mediano dei ricavi indicizzati:\n"
+)
+
+print(
+  benchmark_ricavi_indicizzati,
+  width = Inf
+)
+
+cat(
+  "\n\n==============================\n",
   "OUTLIER IQR - SOLO SEGNALAZIONE\n",
   "==============================\n"
 )
@@ -837,19 +1134,12 @@ print(
 
 cat(
   "\n\n==============================\n",
-  "PCA - LOADING PC1 E PC2\n",
+  "PCA - ASSOCIAZIONI VARIABILI CON PC1 E PC2\n",
   "==============================\n"
 )
 
 print(
-  pca_loadings[
-    ,
-    c(
-      "variabile",
-      "PC1",
-      "PC2"
-    )
-  ],
+  pca_associazioni_report,
   row.names = FALSE
 )
 
