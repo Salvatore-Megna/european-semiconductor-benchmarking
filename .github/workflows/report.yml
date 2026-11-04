@@ -1,0 +1,49 @@
+name: Validate English semiconductor report
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  report:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install figure and PDF tools
+        run: python -m pip install 'Pillow>=10,<13' 'pymupdf>=1.24,<2'
+      - name: Recreate translated chart labels
+        run: python report/en/translate_charts.py
+      - name: Compile translated report
+        uses: xu-cheng/latex-action@v4
+        with:
+          root_file: main.tex
+          working_directory: report/en
+      - name: Verify figures, tables and page count
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import re
+          import pymupdf
+          old = Path("report/main.tex").read_text(encoding="utf-8")
+          new = Path("report/en/main.tex").read_text(encoding="utf-8")
+          def table_nums(tex):
+              return [re.findall(r"(?<![A-Za-z])[-+]?\d+(?:,\d+)?", table)
+                      for table in re.findall(r"\\begin\{table\}([\s\S]*?)\\end\{table\}", tex)]
+          assert old.count(r"\begin{table}") == new.count(r"\begin{table}") == 4
+          assert old.count(r"\begin{figure}") == new.count(r"\begin{figure}") == 4
+          assert table_nums(old) == table_nums(new)
+          with pymupdf.open("report/report.pdf") as it, pymupdf.open("report/en/report.pdf") as saved, pymupdf.open("report/en/main.pdf") as built:
+              assert len(it) == len(saved) == len(built) == 9
+              assert all(abs(p.rect.width-595.276)<1 and abs(p.rect.height-841.89)<1 for p in built)
+              text = "\n".join(p.get_text() for p in built)
+              for key in ("Competitive positioning", "Benchmarking evidence", "PCA", "Conclusions", "References"):
+                  assert key in text, key
+          print("Nine A4 pages, four tables and four historical charts verified.")
+          PY
