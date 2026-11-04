@@ -15,6 +15,8 @@ jobs:
           name: semiconductor-original-report-assets
           path: |
             report/main.tex
+            report/en/main.tex
+            report/en/translate_charts.py
             report/report.pdf
             report/figures/*.png
           retention-days: 7
