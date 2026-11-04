@@ -1,5 +1,7 @@
 # European Semiconductor Financial Benchmarking (2021–2025)
 
+[Project overview — English (PDF)](docs/project-page.pdf) · [Original report — Italian](report/report.pdf)
+
 **Financial benchmarking · Principal component analysis · R · Semiconductor supply chain**
 
 Financial comparison of **ASML, ASM International, Besi, AIXTRON, VAT Group and Technoprobe**, built from published corporate financial statements. The study compares growth, operating profitability, R&D intensity, asset utilization and capital structure, then explores financial profiles through standardized PCA.

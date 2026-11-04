@@ -1,0 +1,53 @@
+\documentclass[12pt,a4paper]{article}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[english]{babel}
+\usepackage{amsmath}
+\usepackage{geometry}
+\usepackage[hidelinks]{hyperref}
+\usepackage{enumitem}
+\geometry{top=2.5cm,bottom=2.5cm,left=2.7cm,right=2.7cm}
+\setlist[itemize]{leftmargin=*,topsep=2pt,itemsep=2pt,parsep=0pt}
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{5pt}
+\begin{document}
+\begin{center}
+{\Large\bfseries European Semiconductor Financial Benchmarking}\\[0.65em]
+{\normalsize Salvatore Megna}\\[0.25em]
+{\small Data Science / Statistical Research}
+\end{center}
+\vspace{1.1em}
+\par
+\vspace{1.15em}
+\noindent{\bfseries Research question}\par
+How do six European semiconductor companies compare in growth, profitability, innovation spending and balance-sheet strength?
+\par
+\par
+\vspace{1.15em}
+\noindent{\bfseries Data and methods}\par
+Financial-statement panel for ASML, ASM International, Besi, AIXTRON, VAT Group and Technoprobe. Main sample: 2021--2025, 30 company-years, with 2020 as an auxiliary base year.
+
+Six financial ratios, annual median benchmarks, IQR screening and PCA on five standardized indicators; original workbook and source records retained.
+\par
+\par
+\vspace{1.15em}
+\noindent{\bfseries Selected results}\par
+\begin{itemize}
+\item Median revenue growth: 31.70\% (2021), -5.33\% (2023) and 11.07\% (2025).
+\item PCA explains 46.17\% on PC1 and 26.47\% on PC2 (72.65\% combined).
+\item IQR screening highlights Besi 2021 and VAT Group 2022, without removing them.
+\end{itemize}
+\par
+\par
+\vspace{1.15em}
+\noindent{\bfseries Interpretation and limitations}\par
+Six firms do not constitute a representative industry sample. Different reporting policies and currencies matter, and the PCA describes correlations rather than causes.
+\par
+\par
+\vspace{1.15em}
+\noindent{\bfseries Reproduce}\par
+\texttt{Rscript scripts/run\_all.R}
+\par
+\vfill
+\noindent\small\href{https://github.com/Salvatore-Megna/european-semiconductor-benchmarking}{Repository and full documentation}
+\end{document}
