@@ -1,6 +1,14 @@
 # European Semiconductor Financial Benchmarking (2021–2025)
 
-[Project overview — English (PDF)](docs/project-page.pdf) · [Original report — Italian](report/report.pdf)
+## Reports
+
+| Document | PDF | LaTeX source |
+| --- | --- | --- |
+| **Full report — Italian (original)** | [Read Italian report](report/report.pdf) | [Italian LaTeX](report/main.tex) |
+| **Full report — English (translation)** | [Read English report](report/en/report.pdf) | [English LaTeX](report/en/main.tex) |
+| Project overview — English (one page) | [Read overview](docs/project-page.pdf) | [Overview LaTeX](docs/project-page.tex) |
+
+The English report faithfully translates the original research study. Its charts retain the original company-year data and geometry, changing only their language labels.
 
 **Financial benchmarking · Principal component analysis · R · Semiconductor supply chain**
 
@@ -73,4 +81,4 @@ See [data documentation](data/README.md), [archived report](report/report.pdf) a
 
 This is a small descriptive panel across different parts of the European semiconductor supply chain, not a representative survey or causal study. Comparisons use ratios and indexed revenue rather than absolute mixed-currency totals (EUR/CHF). Financial restatements and reporting differences remain relevant, and the PCA axes carry no causal interpretation.
 
-Recovered report is in Italian; repository documentation is in English. **Keep private** pending a final review of the report revision, company-source redistribution terms and licensing. Computational validation has already passed. The historical R v7 is preserved but the executable script is an explicit adaptation; no unrecovered lockfile or license is claimed.
+Both the original Italian report and its English translation are available; repository documentation is in English. **Keep private** pending a final review of the report revision, company-source redistribution terms and licensing. Computational validation has already passed. The historical R v7 is preserved but the executable script is an explicit adaptation; no unrecovered lockfile or license is claimed.
